@@ -2,6 +2,10 @@ name: goreleaser
 
 on:
   workflow_dispatch:
+  push:
+    # run only against tags
+    tags:
+      - "*"
 
 jobs:
   goreleaser:
