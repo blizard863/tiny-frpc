@@ -12,48 +12,40 @@ import (
 )
 
 type CmdWrapper struct {
-	name    string
-	closeCh chan struct{}
+	name string
 
 	command string
 	cmd     *exec.Cmd
+
+	outputCh chan string
+	errCh    chan error
 }
 
-func NewCmdWrapper(ctx context.Context, command string, closeCh chan struct{}) *CmdWrapper {
+func NewCmdWrapper(ctx context.Context, command string) *CmdWrapper {
 	parts := strings.Fields(command)
 
 	wrapper := &CmdWrapper{
 		cmd:     exec.CommandContext(ctx, parts[0], parts[1:]...),
 		command: command,
-		closeCh: closeCh,
-	}
 
-	go wrapper.wait()
+		outputCh: make(chan string),
+		errCh:    make(chan error, 1),
+	}
 
 	return wrapper
 }
 
-func (cs *CmdWrapper) wait() {
-	<-cs.closeCh
-	cs.cmd.Wait()
-}
-
 func (cs *CmdWrapper) ExecuteCommand(ctx context.Context) {
-	outputCh := make(chan string)
-	errCh := make(chan error, 1)
-	defer close(outputCh)
-	defer close(errCh)
-
 	go func() {
-		for out := range outputCh {
+		for out := range cs.outputCh {
 			// do not use log, use standard print to better show output
 			fmt.Println(out)
 		}
 	}()
 
 	go func() {
-		for err := range errCh {
-			log.Errorf("run cmd: %v error: %v", cs.command, err)
+		for err := range cs.errCh {
+			log.Errorf("run cmd: [%v] get error: %v", cs.command, err)
 		}
 	}()
 
@@ -74,18 +66,18 @@ func (cs *CmdWrapper) ExecuteCommand(ctx context.Context) {
 	}
 
 	if err := cs.cmd.Start(); err != nil {
-		errCh <- err
+		cs.errCh <- err
 		return
 	}
 
 	stdoutReader := bufio.NewReader(stdoutPipe)
 	stderrReader := bufio.NewReader(stderrPipe)
 
-	go cs.readPipe(stdoutReader, outputCh)
-	go cs.readPipe(stderrReader, outputCh)
+	go cs.readPipe(stdoutReader, cs.outputCh)
+	go cs.readPipe(stderrReader, cs.outputCh)
 
 	if err := cs.cmd.Wait(); err != nil {
-		errCh <- err
+		cs.errCh <- err
 	}
 }
 
@@ -100,4 +92,8 @@ func (cs *CmdWrapper) readPipe(pipe *bufio.Reader, outputCh chan<- string) {
 		}
 		outputCh <- line
 	}
+}
+
+func (cs *CmdWrapper) Close() {
+	cs.cmd.Process.Kill()
 }

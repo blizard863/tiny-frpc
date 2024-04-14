@@ -3,9 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gofrp/tiny-frpc/pkg/config"
 	v1 "github.com/gofrp/tiny-frpc/pkg/config/v1"
+	"github.com/gofrp/tiny-frpc/pkg/model"
 	"github.com/gofrp/tiny-frpc/pkg/util"
 	"github.com/gofrp/tiny-frpc/pkg/util/log"
 	"github.com/gofrp/tiny-frpc/pkg/util/version"
@@ -40,17 +45,28 @@ func main() {
 
 	log.Infof("common cfg: %v, proxy cfg: %v, visitor cfg: %v", util.JSONEncode(cfg), util.JSONEncode(proxyCfgs), util.JSONEncode(visitorCfgs))
 
-	runner.Run(cfg, proxyCfgs, visitorCfgs)
+	err = runner.New(cfg, proxyCfgs, visitorCfgs)
+	if err != nil {
+		log.Errorf("new runner error: %v", err)
+		return
+	}
+
+	go handleTermSignal(runner)
+
+	err = runner.Run()
+	if err != nil {
+		log.Errorf("run error: %v", err)
+		return
+	}
+
+	time.Sleep(time.Millisecond * 10)
+	log.Infof("process exit...")
 }
 
-type Runner interface {
-	Run(commonCfg *v1.ClientCommonConfig, pxyCfg []v1.ProxyConfigurer, vCfg []v1.VisitorConfigurer)
+func handleTermSignal(run model.Runner) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	v := <-ch
+	log.Infof("get signal term: %v, close runner", v)
+	run.Close()
 }
-
-type defaultRunner struct{}
-
-func (r defaultRunner) Run(commonCfg *v1.ClientCommonConfig, pxyCfg []v1.ProxyConfigurer, vCfg []v1.VisitorConfigurer) {
-	fmt.Println("Running default implementation")
-}
-
-var runner Runner = defaultRunner{}
