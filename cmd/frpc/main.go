@@ -3,11 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"sync"
 
 	"github.com/gofrp/tiny-frpc/pkg/config"
 	v1 "github.com/gofrp/tiny-frpc/pkg/config/v1"
-	"github.com/gofrp/tiny-frpc/pkg/gssh"
 	"github.com/gofrp/tiny-frpc/pkg/util"
 	"github.com/gofrp/tiny-frpc/pkg/util/log"
 	"github.com/gofrp/tiny-frpc/pkg/util/version"
@@ -42,35 +40,17 @@ func main() {
 
 	log.Infof("common cfg: %v, proxy cfg: %v, visitor cfg: %v", util.JSONEncode(cfg), util.JSONEncode(proxyCfgs), util.JSONEncode(visitorCfgs))
 
-	goSSHParams := config.ParseFRPCConfigToGoSSHParam(cfg, proxyCfgs, visitorCfgs)
-
-	log.Infof("ssh cmds len_num: %v", len(goSSHParams))
-
-	wg := new(sync.WaitGroup)
-
-	for _, cmd := range goSSHParams {
-		wg.Add(1)
-
-		go func(cmd config.GoSSHParam) {
-			defer wg.Done()
-
-			log.Infof("start to run: %v", cmd)
-
-			tc, err := gssh.NewTunnelClient(cmd.LocalAddr, cmd.ServerAddr, cmd.SSHExtraCmd)
-			if err != nil {
-				log.Errorf("new ssh tunnel client error: %v", err)
-				return
-			}
-
-			err = tc.Start()
-			if err != nil {
-				log.Errorf("cmd: %v run error: %v", cmd, err)
-				return
-			}
-		}(cmd)
-	}
-
-	wg.Wait()
-
-	log.Infof("stopping process calling native ssh to frps, exit...")
+	runner.Run(cfg, proxyCfgs, visitorCfgs)
 }
+
+type Runner interface {
+	Run(commonCfg *v1.ClientCommonConfig, pxyCfg []v1.ProxyConfigurer, vCfg []v1.VisitorConfigurer)
+}
+
+type defaultRunner struct{}
+
+func (r defaultRunner) Run(commonCfg *v1.ClientCommonConfig, pxyCfg []v1.ProxyConfigurer, vCfg []v1.VisitorConfigurer) {
+	fmt.Println("Running default implementation")
+}
+
+var runner Runner = defaultRunner{}
