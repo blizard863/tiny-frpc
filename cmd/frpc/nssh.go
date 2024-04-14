@@ -19,7 +19,7 @@ type NativeSSHRun struct{}
 func (r NativeSSHRun) Run(commonCfg *v1.ClientCommonConfig, pxyCfg []v1.ProxyConfigurer, vCfg []v1.VisitorConfigurer) {
 	sshCmds := config.ParseFRPCConfigToSSHCmd(commonCfg, pxyCfg, vCfg)
 
-	log.Infof("ssh cmds len_num: %v", len(sshCmds))
+	log.Infof("proxy total len: %v", len(sshCmds))
 
 	closeCh := make(chan struct{})
 	wg := new(sync.WaitGroup)

@@ -52,7 +52,7 @@ func NewTunnelClient(localAddr string, sshServer string, commands string) (*Tunn
 		return nil, fmt.Errorf("failed to get default private key path: %v", err)
 	}
 
-	log.Infof("get ssh private key file: %v", privateKeyPath)
+	log.Infof("get ssh private key file: [%v] to communicate with frps by ssh protocol", privateKeyPath)
 
 	authMethod, err := publicKeyAuthFunc(privateKeyPath)
 	if err != nil {

@@ -18,7 +18,7 @@ type GoSSHRun struct{}
 func (r GoSSHRun) Run(commonCfg *v1.ClientCommonConfig, pxyCfg []v1.ProxyConfigurer, vCfg []v1.VisitorConfigurer) {
 	goSSHParams := config.ParseFRPCConfigToGoSSHParam(commonCfg, pxyCfg, vCfg)
 
-	log.Infof("ssh cmds len_num: %v", len(goSSHParams))
+	log.Infof("proxy total len: %v", len(goSSHParams))
 
 	wg := new(sync.WaitGroup)
 
