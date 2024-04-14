@@ -55,7 +55,7 @@ func Ternary[T any](condition bool, ifOutput T, elseOutput T) T {
 	return elseOutput
 }
 
-func handleTermSignal() {
+func HandleTermSignal() {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	<-ch

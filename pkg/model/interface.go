@@ -1,6 +1,6 @@
 package model
 
 type ServiceRunner interface {
-	Start() error
+	Run() error
 	Close() error
 }

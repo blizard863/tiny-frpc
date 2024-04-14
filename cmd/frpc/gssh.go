@@ -47,7 +47,6 @@ func (r GoSSHRun) Run(commonCfg *v1.ClientCommonConfig, pxyCfg []v1.ProxyConfigu
 	wg.Wait()
 
 	log.Infof("stopping process calling native ssh to frps, exit...")
-
 }
 
 // 构建标签 runner1 下的 init 函数将 runner1 实现赋值给 runner 全局变量
