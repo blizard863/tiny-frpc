@@ -41,7 +41,7 @@ type TunnelClient struct {
 	authMethod ssh.AuthMethod
 }
 
-// 在 sshDir 中按优先级查找已有密钥，返回第一个存在的路径；都不存在返回空
+// find existing key in sshDir by priority, return first found path or empty if none
 func findExistingKey(sshDir string) (string, error) {
 	candidates := []string{
 		filepath.Join(sshDir, "id_ed25519"),
@@ -59,7 +59,7 @@ func findExistingKey(sshDir string) (string, error) {
 	return "", nil
 }
 
-// 按优先级查找已有密钥，都不存在则自动生成 ed25519 密钥
+// find existing key by priority (ed25519 > rsa), auto-generate ed25519 if none found
 func getDefaultPrivateKeyPath() (string, error) {
 	usr, err := user.Current()
 	if err != nil {
@@ -73,7 +73,7 @@ func getDefaultPrivateKeyPath() (string, error) {
 		return p, nil
 	}
 
-	// 都不存在，自动生成 ed25519 密钥到 ~/.ssh/
+	// none found, auto-generate ed25519 key to ~/.ssh/
 	defaultKeyPath := filepath.Join(sshDir, "id_ed25519")
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		return "", fmt.Errorf("failed to create ssh directory: %v", err)
@@ -85,7 +85,7 @@ func getDefaultPrivateKeyPath() (string, error) {
 	return defaultKeyPath, nil
 }
 
-// 生成 ed25519 密钥对，私钥无密码保护
+// generate ed25519 key pair without passphrase protection
 func generateED25519Key(path string) error {
 	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
