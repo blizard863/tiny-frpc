@@ -15,6 +15,9 @@
 package gssh
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"os"
@@ -38,12 +41,75 @@ type TunnelClient struct {
 	authMethod ssh.AuthMethod
 }
 
+// 在 sshDir 中按优先级查找已有密钥，返回第一个存在的路径；都不存在返回空
+func findExistingKey(sshDir string) (string, error) {
+	candidates := []string{
+		filepath.Join(sshDir, "id_ed25519"),
+		filepath.Join(sshDir, "id_rsa"),
+	}
+	for _, p := range candidates {
+		_, err := os.Stat(p)
+		if err == nil {
+			return p, nil
+		}
+		if !os.IsNotExist(err) {
+			return "", fmt.Errorf("failed to stat key file %v: %v", p, err)
+		}
+	}
+	return "", nil
+}
+
+// 按优先级查找已有密钥，都不存在则自动生成 ed25519 密钥
 func getDefaultPrivateKeyPath() (string, error) {
 	usr, err := user.Current()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get current user: %v", err)
 	}
-	return filepath.Join(usr.HomeDir, ".ssh", "id_rsa"), nil
+	sshDir := filepath.Join(usr.HomeDir, ".ssh")
+
+	if p, err := findExistingKey(sshDir); err != nil {
+		return "", err
+	} else if p != "" {
+		return p, nil
+	}
+
+	// 都不存在，自动生成 ed25519 密钥到 ~/.ssh/
+	defaultKeyPath := filepath.Join(sshDir, "id_ed25519")
+	if err := os.MkdirAll(sshDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create ssh directory: %v", err)
+	}
+	log.Infof("no existing ssh key found, generating ed25519 key at: [%v]", defaultKeyPath)
+	if err := generateED25519Key(defaultKeyPath); err != nil {
+		return "", fmt.Errorf("failed to generate private key: %v", err)
+	}
+	return defaultKeyPath, nil
+}
+
+// 生成 ed25519 密钥对，私钥无密码保护
+func generateED25519Key(path string) error {
+	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return fmt.Errorf("failed to generate ed25519 key: %v", err)
+	}
+
+	privPEM, err := ssh.MarshalPrivateKey(privKey, "")
+	if err != nil {
+		return fmt.Errorf("failed to marshal private key: %v", err)
+	}
+	if err := os.WriteFile(path, pem.EncodeToMemory(privPEM), 0600); err != nil {
+		return fmt.Errorf("failed to write private key file: %v", err)
+	}
+
+	pubSSH, err := ssh.NewPublicKey(pubKey)
+	if err != nil {
+		return fmt.Errorf("failed to create public key: %v", err)
+	}
+	if err := os.WriteFile(path+".pub", ssh.MarshalAuthorizedKey(pubSSH), 0644); err != nil {
+		return fmt.Errorf("failed to write public key file: %v", err)
+	}
+
+	log.Infof("ed25519 key generated at: [%v]", path)
+	return nil
 }
 
 func publicKeyAuthFunc(kPath string) (ssh.AuthMethod, error) {
